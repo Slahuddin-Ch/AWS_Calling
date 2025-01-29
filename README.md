@@ -1,6 +1,6 @@
 # slahuddin-ch-aws_calling
 
-A concise repository demonstrating an AI-based voice assistant that uses **Twilio** for telephony, **OpenAI** (GPT & Whisper) for speech recognition and language understanding, and **Gradio** for a simple web-based chatbot interface.
+An AI-based voice assistant that uses **Twilio** for telephony, **OpenAI** (GPT & Whisper) for speech recognition and language understanding, and **Gradio** for a simple web-based chatbot interface.
 
 ## Directory Structure
 ```
@@ -74,7 +74,3 @@ slahuddin-ch-aws_calling/
 This project is provided for demonstration and educational purposes.
 
 ---
-
-**Explanation of What Changed:**
-- **Added a new file**: `README.md` with instructions on how to set up, configure, and run the project.  
-- No existing source code was altered; this is purely a documentation addition to help users understand the repository.
