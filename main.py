@@ -65,7 +65,8 @@ async def index_page():
 async def handle_incoming_call(request: Request):
     """Handle incoming calls to the AI assistant"""
     print(f"[{datetime.now()}] Incoming call Received....")
-    print("Payload", request.json())
+    payload = await request.json()
+    print("Payload:", payload)
     response = VoiceResponse()
     response.say("Welcome to the AI Voice Assistant.")
     print("Name", request.url.hostname)
