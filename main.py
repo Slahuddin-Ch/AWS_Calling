@@ -138,7 +138,7 @@ async def handle_media_stream(websocket: WebSocket):
                         name = response['name']
                         args = json.loads(response['arguments'])
                         phone_number = args['phone_number']
-                        # print(call_id, name, args, phone_number)
+                        print(call_id, name, args, phone_number)
 
                         data = get_user_data(phone_number)
                         function_call_output = {
