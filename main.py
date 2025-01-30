@@ -66,8 +66,8 @@ async def handle_incoming_call(request: Request):
     """Handle incoming calls to the AI assistant"""
     print(f"[{datetime.now()}] Incoming call Received....")
 
-    body = await request.body()
-    print(body)
+    form_data = await request.form()
+    print(form_data)
 
     response = VoiceResponse()
     response.say("Welcome to the AI Voice Assistant.")
