@@ -11,6 +11,7 @@ from fastapi.websockets import WebSocketDisconnect
 from twilio.rest import Client
 from twilio.twiml.voice_response import VoiceResponse, Connect
 from dotenv import load_dotenv
+from datetime import datetime
 
 load_dotenv()
 
@@ -63,7 +64,7 @@ async def index_page():
 @app.post("/incoming-call")
 async def handle_incoming_call(request: Request):
     """Handle incoming calls to the AI assistant"""
-    print("Incoming call Recieved....")
+    print(f"[{datetime.now()}] Incoming call Received....")
     response = VoiceResponse()
     response.say("Welcome to the AI Voice Assistant.")
     print("Name", request.url.hostname)
@@ -72,13 +73,13 @@ async def handle_incoming_call(request: Request):
     connect = Connect()
     connect.stream(url=f'wss://{request.url.hostname}/media-stream')  
     response.append(connect)
-    print("Incoming call returned...")
+    print(f"[{datetime.now()}]: Incoming call returned...")
     return HTMLResponse(content=str(response), media_type="application/xml")
 
 
 @app.websocket("/media-stream")
 async def handle_media_stream(websocket: WebSocket):
-    print("Client connected")
+    print(f"[{datetime.now()}] Client connected")
     await websocket.accept()  
     async with websockets.connect(
         'wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17',
@@ -87,12 +88,12 @@ async def handle_media_stream(websocket: WebSocket):
             "OpenAI-Beta": "realtime=v1"
         }
     ) as openai_ws:
-        print("OpenAI connected")
+        print(f"[{datetime.now()}] OpenAI connected")
         await send_session_update(openai_ws)
         stream_sid = None
         session_id = None
         async def receive_from_twilio():
-            print("Received from Twilio")
+            print(f"[{datetime.now()}] Received from Twilio")
             nonlocal stream_sid
             try:
                 async for message in websocket.iter_text(): 
@@ -111,27 +112,27 @@ async def handle_media_stream(websocket: WebSocket):
                 if openai_ws.open:
                     await openai_ws.close()
         async def send_to_twilio():
-            print("Send to Twilio")
+            print(f"[{datetime.now()}] Send to Twilio")
             nonlocal stream_sid, session_id
             try:
                 async for openai_message in openai_ws:
                     response = json.loads(openai_message)
-                    if response['type'] in LOG_EVENT_TYPES:
-                        print(f"Received event: {response['type']}", response)
+                    # if response['type'] in LOG_EVENT_TYPES:
+                        # print(f"Received event: {response['type']}", response)
                     if response.get("type") == "error":
-                        print(f"\n\n>>> Received error from OpenAI: {response}\n\n")
+                        # print(f"\n\n>>> Received error from OpenAI: {response}\n\n")
                         assert False, "Received error from OpenAI"
 
                     if response['type'] == 'conversation.item.input_audio_transcription.completed':
                         user_transcript = response['transcript']
-                        print("User_transcript", user_transcript)
+                        # print("User_transcript", user_transcript)
                     if response['type'] == 'response.function_call_arguments.done':
-                        print("Function Call Triggered by LLM", response)
+                        # print("Function Call Triggered by LLM", response)
                         call_id = response['call_id']
                         name = response['name']
                         args = json.loads(response['arguments'])
                         phone_number = args['phone_number']
-                        print(call_id, name, args, phone_number)
+                        # print(call_id, name, args, phone_number)
 
                         data = get_user_data(phone_number)
                         function_call_output = {
@@ -148,7 +149,7 @@ async def handle_media_stream(websocket: WebSocket):
                         if response['type'] == 'response.done' and len(response['response']['output']) != 0:
                             if response['response']['output'][0]['type'] == 'message':
                                 assistant_transcript = response['response']['output'][0]['content'][0]['transcript']
-                                print("Assistant_Transcript", assistant_transcript)
+                                # print("Assistant_Transcript", assistant_transcript)
                         else:
                             pass
                     except Exception as e:
@@ -193,6 +194,6 @@ async def send_session_update(openai_ws):
             "temperature": 0.8,
         }
     }
-    print("Session is updating")
+    print(f"[{datetime.now()}] Session is updating")
     await openai_ws.send(json.dumps(session_update))
 
