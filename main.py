@@ -97,6 +97,7 @@ async def handle_media_stream(websocket: WebSocket):
         await send_session_update(openai_ws)
         stream_sid = None
         session_id = None
+        i = 0
         async def receive_from_twilio():
             print(f"[{datetime.now()}] Received from Twilio")
             nonlocal stream_sid
