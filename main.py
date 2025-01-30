@@ -178,6 +178,24 @@ async def handle_media_stream(websocket: WebSocket):
                 print(f"Error in send_to_twilio: {e}")
         await asyncio.gather(receive_from_twilio(), send_to_twilio())
 
+async def send_initial_conversation_item(openai_ws):
+    """Send initial conversation item if AI talks first."""
+    initial_conversation_item = {
+        "type": "conversation.item.create",
+        "item": {
+            "type": "message",
+            "role": "user",
+            "content": [
+                {
+                    "type": "input_text",
+                    "text": "Greet the user with 'Hello there! I am an AI voice assistant powered by Twilio and the OpenAI Realtime API. You can ask me for facts, jokes, or anything you can imagine. How can I help you?'"
+                }
+            ]
+        }
+    }
+    await openai_ws.send(json.dumps(initial_conversation_item))
+    await openai_ws.send(json.dumps({"type": "response.create"}))
+
 async def send_session_update(openai_ws):
     session_update = {
         "type": "session.update",
@@ -202,3 +220,5 @@ async def send_session_update(openai_ws):
     }
     print(f"[{datetime.now()}] Session is updating")
     await openai_ws.send(json.dumps(session_update))
+
+    await send_initial_conversation_item(openai_ws)
