@@ -67,8 +67,9 @@ async def handle_incoming_call(request: Request):
     print(f"[{datetime.now()}] Incoming call Received....")
 
     form_data = await request.form()
-    print(form_data)
-
+    data = dict(form_data)
+    print(data)
+    
     response = VoiceResponse()
     response.say("Welcome to the AI Voice Assistant.")
     print("Name", request.url.hostname)
