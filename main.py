@@ -63,6 +63,7 @@ async def index_page():
 @app.post("/incoming-call")
 async def handle_incoming_call(request: Request):
     """Handle incoming calls to the AI assistant"""
+    print("Incoming call Recieved....")
     response = VoiceResponse()
     response.say("Welcome to the AI Voice Assistant.")
     print("Name", request.url.hostname)
@@ -71,6 +72,7 @@ async def handle_incoming_call(request: Request):
     connect = Connect()
     connect.stream(url=f'wss://{request.url.hostname}/media-stream')  
     response.append(connect)
+    print("Incoming call returned...")
     return HTMLResponse(content=str(response), media_type="application/xml")
 
 
@@ -85,11 +87,12 @@ async def handle_media_stream(websocket: WebSocket):
             "OpenAI-Beta": "realtime=v1"
         }
     ) as openai_ws:
-
+        print("OpenAI connected")
         await send_session_update(openai_ws)
         stream_sid = None
         session_id = None
         async def receive_from_twilio():
+            print("Received from Twilio")
             nonlocal stream_sid
             try:
                 async for message in websocket.iter_text(): 
@@ -108,6 +111,7 @@ async def handle_media_stream(websocket: WebSocket):
                 if openai_ws.open:
                     await openai_ws.close()
         async def send_to_twilio():
+            print("Send to Twilio")
             nonlocal stream_sid, session_id
             try:
                 async for openai_message in openai_ws:
@@ -189,5 +193,6 @@ async def send_session_update(openai_ws):
             "temperature": 0.8,
         }
     }
+    print("Session is updating")
     await openai_ws.send(json.dumps(session_update))
 
