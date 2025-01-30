@@ -69,12 +69,12 @@ async def handle_incoming_call(request: Request):
     form_data = await request.form()
     data = dict(form_data)
     print(data)
-    
+
     response = VoiceResponse()
-    response.say("Welcome to the AI Voice Assistant.")
-    print("Name", request.url.hostname)
-    response.pause(length=1)
-    response.say("You can start talking now!")
+    # response.say("Welcome to the AI Voice Assistant.")
+    # print("Name", request.url.hostname)
+    # response.pause(length=1)
+    # response.say("You can start talking now!")
     connect = Connect()
     connect.stream(url=f'wss://{request.url.hostname}/media-stream')  
     response.append(connect)
@@ -183,7 +183,7 @@ async def send_session_update(openai_ws):
         "session": {
             "input_audio_format": "g711_ulaw",
             "output_audio_format": "g711_ulaw",
-            "voice": "alloy",
+            "voice": "sage",
             "instructions": prompt,
             "input_audio_transcription": {
                 "model": "whisper-1"
@@ -201,4 +201,3 @@ async def send_session_update(openai_ws):
     }
     print(f"[{datetime.now()}] Session is updating")
     await openai_ws.send(json.dumps(session_update))
-
