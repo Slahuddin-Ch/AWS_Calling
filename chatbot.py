@@ -45,15 +45,16 @@ def get_user_data(phone_number):
 
 
 
-hidden_prompt = """You are a customer support agent named "Danial." Your task is to assist customers with their queries. 
-Whenever a user approaches you, you will greet them politely and then ask the following question:
-Question: "Before starting the conversation, can you please share your registered phone number by typing it?"
+hidden_prompt = """You are a customer support agent named "Lisa." Your task is to assist customers with their queries. 
+Whenever a user approaches you, you will ask the following question:
+Question:"Before Starting the conversation, can you please share your registered phone number?"
+
 On the basis of `phone_number` provided by the user, you will call the `get_user_data` function to retrieve user information from the database.
 """
 
 # Editable part of the system prompt
-default_editable_prompt = """After requesting phone number, you will inquire about their queries and issues. If the user asks about canceling their subscription, you will ask the question on the basis of client's active subscriptions:
-If the user has two active subscription:
+editable_prompt = """After requesting phone number, you will inquire about their queries and issues. If the user asks about canceling their subscription, you will ask the question on the basis of client's active subscriptions:
+If the user has two active subscription, you will ask following question:
     Question: "Which subscription would you like to cancel—Legal Subscription, Upsell Subscription, or both?"
 If the user has only one active subscription:
     Question: "Would you like to cancel [name of active subscription]?"
@@ -63,6 +64,10 @@ Question: "Are you sure you want to cancel the [name of subscription] subscripti
 
 If the user confirms, you will gently respond by informing them that their subscription has been canceled.
 If at any point the user asks or shows that they want to talk to a human agent, you will gently reply: "Your phone call is forwarding to a human agent."
+Communication Style:
+- Use simple language. Break down complex concepts.
+- Show understanding and warmth while maintaining professionalism.
+- Use "Umm...", "Well...", and "I mean" sparingly and appropriately.
 """
 
 def create_transcription(audio_path):
@@ -120,7 +125,7 @@ def chatting(user, messages, editable_prompt, model, temperature):
     
     try:
         # If no messages exist, initialize system prompt
-        if len(messages) == 0:
+        if len(messages) == 1:
             system_prompt = hidden_prompt + editable_prompt
             messages.append({"role": "system", "content": system_prompt})
 
@@ -190,7 +195,7 @@ def format_chat_history_html(chat_history):
         if message["role"] == "user":
             html_history += f"<p style='color: grey;'>User: {message['content']}</p>"
         elif message["role"] == "assistant":
-            html_history += f"<p style='color: black; font-weight: bold;'>Danial: {message['content']}</p>"
+            html_history += f"<p style='color: black; font-weight: bold;'>Lisa: {message['content']}</p>"
     return html_history
 
 # Unified input handler: Handle both text and audio inputs
@@ -228,15 +233,18 @@ with gr.Blocks(css="""
     }
 
 """) as chatbot_ui:
-    gr.HTML("<div class='custom-title'>✨ Customer Support Chatbot - Danial ✨</div>")
+    gr.HTML("<div class='custom-title'>✨ Customer Support Chatbot - Lisa ✨</div>")
     
-    chat_history = gr.State([])
+    chat_history = gr.State([
+        {"role": "assistant", "content": 'Thanks for reaching out to "Legal Services", I am Lisa, how can I assist you?'}
+    ])
+
     with gr.Row():
         with gr.Column(scale=3):
             gr.Markdown("### System Settings")
             editable_prompt = gr.Textbox(
                 label="Editable Instructions",
-                value=default_editable_prompt,
+                value=editable_prompt,
                 lines=8,
                 elem_classes=["editable-prompt"]
             )
@@ -258,9 +266,10 @@ with gr.Blocks(css="""
             gr.Markdown("### Chat Interface")
             chat_history_display = gr.HTML(
                 label="Chat History",
-                value="<i>*Start your conversation!*</i>",
-                elem_classes=["chat-history"]  # Apply the CSS class for styling
+                value=format_chat_history_html(chat_history.value),
+                elem_classes=["chat-history"]
             )
+
 
             user_input = gr.Textbox(label="Your Message", placeholder="Type your query here...", elem_classes=["label"])
             audio_input = gr.Audio(sources=["microphone", "upload"], type="filepath", label="Or Record/Upload Audio")
