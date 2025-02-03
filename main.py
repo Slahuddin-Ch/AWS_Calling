@@ -43,7 +43,7 @@ def get_user_data(phone_number):
     if str(phone_number) == '+18053078694':
         return json.dumps({"name":"John", "phone_number":"+18053078694", "active_subscription":["Upsel", "Legal"]})
     else:
-        return json.dumps({"name":"Dani", "phone_number":"12345", "active_subscription":["Legal"]})
+        return json.dumps({"name":"Dani", "phone_number":"12345", "active_subscription":["Legal", "Upsel"]})
 
 prompt = "instructions.txt"
 with open(prompt, 'r') as file:
@@ -123,8 +123,8 @@ async def handle_media_stream(websocket: WebSocket):
             try:
                 async for openai_message in openai_ws:
                     response = json.loads(openai_message)
-                    # if response['type'] in LOG_EVENT_TYPES:
-                        # print(f"Received event: {response['type']}", response)
+                    if response['type'] in LOG_EVENT_TYPES:
+                        print(f"Received event: {response['type']}", response)
                     if response.get("type") == "error":
                         # print(f"\n\n>>> Received error from OpenAI: {response}\n\n")
                         assert False, "Received error from OpenAI"
@@ -188,7 +188,7 @@ async def send_initial_conversation_item(openai_ws):
             "content": [
                 {
                     "type": "input_text",
-                    "text": "Greet the user with 'Thank you for calling Legal Services, this is LISA, how can I help you today?'"
+                    "text": "Greet the user by saying: 'Thank you for calling Legal Services, this is LISA, how can I help you today?'"
                 }
             ]
         }
@@ -209,9 +209,9 @@ async def send_session_update(openai_ws):
             },
             "turn_detection": {
             "type": "server_vad",
-            "threshold": 0.4,
-            "prefix_padding_ms": 500,
-            "silence_duration_ms": 600,
+            # "threshold": 0.4,
+            # "prefix_padding_ms": 500,
+            # "silence_duration_ms": 600,
         },
             "tools" : tools,
             "modalities": ["text", "audio"],
