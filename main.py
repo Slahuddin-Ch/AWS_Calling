@@ -42,6 +42,8 @@ LOG_EVENT_TYPES = [
 def get_user_data(phone_number):
     if str(phone_number) == '+18053078694':
         return json.dumps({"name":"John", "phone_number":"+18053078694", "active_subscription":["Upsel", "Legal"]})
+    elif str(phone_number) == '+923364589301':
+        return json.dumps({"name":"Sam", "phone_number":"+923364589301", "active_subscription":["Legal"]})
     else:
         return json.dumps({"name":"Dani", "phone_number":"12345", "active_subscription":["Legal", "Upsel"]})
 
