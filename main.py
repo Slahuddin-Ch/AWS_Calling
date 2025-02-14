@@ -9,6 +9,7 @@ from fastapi.websockets import WebSocketDisconnect
 from twilio.twiml.voice_response import VoiceResponse, Connect, Say, Stream
 from dotenv import load_dotenv
 from twilio.rest import Client
+from tools import tools
 
 load_dotenv()
 
@@ -49,23 +50,6 @@ def get_user_data(phone_number):
     else:
         return json.dumps({"name":"","data":"The data against the user's phone number is not found."})
         # return json.dumps({"name":"Dani", "phone_number":"12345", "active_subscription":["Legal", "Upsel"]})
-
-tools = [
-            {
-                "type": "function",
-                "name": "get_user_data",
-                "description": "Get the user information from the Database...",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "phone_number": { "type": "string", "description": "It is phone number of user that consists of country code plus 10 digits, e.g., country code like `+92` and `1` etc and 10 digits like `3332326709`" }
-                    },
-                    "required": ["phone_number"],
-
-                }
-            },
-        ]
-
 
 
 SHOW_TIMING_MATH = False
