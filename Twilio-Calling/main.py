@@ -2,14 +2,15 @@ import os
 import json
 import base64
 import asyncio
+import aiofiles
 import websockets
-from fastapi import FastAPI, WebSocket, Request
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.websockets import WebSocketDisconnect
-from twilio.twiml.voice_response import VoiceResponse, Connect, Say, Stream
-from dotenv import load_dotenv
-from twilio.rest import Client
 from tools import tools
+from twilio.rest import Client
+from dotenv import load_dotenv
+from fastapi import FastAPI, WebSocket, Request
+from fastapi.websockets import WebSocketDisconnect
+from fastapi.responses import HTMLResponse, JSONResponse
+from twilio.twiml.voice_response import VoiceResponse, Connect, Say, Stream
 
 load_dotenv()
 
@@ -51,6 +52,86 @@ def get_user_data(phone_number):
         return json.dumps({"name":"","data":"The data against the user's phone number is not found."})
         # return json.dumps({"name":"Dani", "phone_number":"12345", "active_subscription":["Legal", "Upsel"]})
 
+def forward_call(call_sid, agent_number="+923364589301"):
+    """Forward the call to a human agent."""
+    try:
+        call = client.calls(call_sid).update(
+            twiml=f"""
+            <Response>
+                <Dial>{agent_number}</Dial>
+            </Response>
+            """
+        )
+        print(f"Call forwarded to {agent_number} successfully.")
+    except Exception as e:
+        print(f"Error forwarding call {call_sid}: {str(e)}")
+
+
+def end_call(call_sid):
+    try:
+        call = client.calls(call_sid).update(status='completed')
+        print(f"Call with SID {call.sid} ended successfully.")
+    except Exception as e:
+        print(f"Error ending call {call_sid}: {str(e)}")
+
+
+async def finalize_call(callSid: str, phone_number: str, transcript_history: list):
+    # Combine the transcript entries into a single text
+    transcript_text = "\n".join(
+        [f"{entry['role']}: {entry['text']}" for entry in transcript_history]
+    )
+    # For production, replace this file-writing with database logic.
+    filename = f"transcripts/call_transcript_{callSid}.txt"
+    async with aiofiles.open(filename, mode="w") as f:
+        await f.write(f"Phone Number: {phone_number}\n")
+        await f.write(f"Call Sid: {callSid}\n")
+        await f.write("Transcript:\n")
+        await f.write(transcript_text)
+    print(f"Transcript for call {callSid} saved to {filename}")
+
+
+tools = [
+            {
+                "type": "function",
+                "name": "get_user_data",
+                "description": "Get the user information from the Database...",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "phone_number": { "type": "string", "description": "It is phone number of user that consists of country code plus 10 digits, e.g., country code like `+92` and `1` etc and 10 digits like `3332326709`" }
+                    },
+                    "required": ["phone_number"],
+
+                }
+            },
+            {
+                "type": "function",
+                "name": "end_call",
+                "description": "End the ongoing call",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "callSid": { "type": "string", "description": "It is unique Id of the call." }
+                    },
+                    "required": ["callSid"],
+
+                }
+            },
+            {
+                "type": "function",
+                "name": "forward_call",
+                "description": "forward the ongoing call",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "callSid": { "type": "string", "description": "It is unique Id of the call." }
+                    },
+                    "required": ["callSid"],
+
+                }
+            }
+        ]
+
 
 SHOW_TIMING_MATH = False
 
@@ -75,22 +156,30 @@ async def handle_incoming_call(request: Request):
     print(data)
     host = request.url.hostname
     connect = Connect()
-    stream = Stream(url=f'wss://{host}/media-stream/{phone_number}')
+    # connect.stream(url=f'wss://{host}/media-stream')
+    # stream = Stream(url=f'wss://{host}/media-stream')
+    # stream.parameter(name="caller", value=phone_number)
+    # connect.append(stream)
+    # connect.stream(url=f'wss://{host}/media-stream?caller={phone_number}')
+    stream = Stream(url=f'wss://{host}/media-stream/{phone_number}/{callSid}')
     connect.append(stream)
     response.append(connect)
     return HTMLResponse(content=str(response), media_type="application/xml")
 
-@app.websocket("/media-stream/{phone_number}")
-async def handle_media_stream(websocket: WebSocket, phone_number:str):
+@app.websocket("/media-stream/{phone_number}/{callSid}")
+async def handle_media_stream(websocket: WebSocket, phone_number:str, callSid:str):
     """Handle WebSocket connections between Twilio and OpenAI."""
     print("Client connected")
     print("websocket", websocket)
-
+    # caller = websocket['customParameters'].get("caller")
+    # print("Caller from query params:", caller)
     await websocket.accept()
     # Updated part at the beginning of handle_media_stream:
     print("phone_number", phone_number)
+    print("CallSid", callSid)
 
     # print("Caller from query params 2:", caller)
+    transcript_history = []
 
 # Updated call to initialize_session:
     async with websockets.connect(
@@ -101,7 +190,7 @@ async def handle_media_stream(websocket: WebSocket, phone_number:str):
         }
     ) as openai_ws:
         
-        await initialize_session(openai_ws, phone_number)
+        await initialize_session(openai_ws, phone_number, callSid)
 
         # Connection specific state
         stream_sid = None
@@ -151,9 +240,13 @@ async def handle_media_stream(websocket: WebSocket, phone_number:str):
                     response = json.loads(openai_message)
                     if response['type'] in LOG_EVENT_TYPES:
                         print(f"Received event: {response['type']}", response)
+                    # if response.get("type") == "error":
+                    #     print(f"\n\n>>> Received error from OpenAI: {response}\n\n")
+                    #     assert False, "Received error from OpenAI"
 
                     if response['type'] == 'conversation.item.input_audio_transcription.completed':
                         user_transcript = response['transcript']
+                        transcript_history.append({"role": "user", "text": user_transcript})
                         print("User_transcript", user_transcript)
                     if response['type'] == 'response.function_call_arguments.done':
                         # print("Function Call Triggered by LLM", response)
@@ -165,6 +258,22 @@ async def handle_media_stream(websocket: WebSocket, phone_number:str):
                             print(call_id, name, args, phone_number)
 
                             data = get_user_data(phone_number)
+                        elif name == "end_call":
+                            args = json.loads(response['arguments'])
+                            callSid = args['callSid']
+                            print("callSid", callSid)
+                            end_call(callSid)
+
+                        elif name == "forward_call":
+                            args = json.loads(response['arguments'])
+                            callSid = args['callSid']  # Fallback to the current callSid if not provided
+                            print(callSid)
+                            agent_number = "+923364589301"
+                            print(f"Function Call: Forwarding call with SID {callSid} to agent {agent_number}")
+                            forward_call(callSid, agent_number)
+                            data = json.dumps({"status": "Call forwarded", "agent_number": agent_number})
+
+
 
                         function_call_output = {
                             "type": "conversation.item.create",
@@ -181,6 +290,8 @@ async def handle_media_stream(websocket: WebSocket, phone_number:str):
                             if response['response']['output'][0]['type'] == 'message':
                                 assistant_transcript = response['response']['output'][0]['content'][0]['transcript']
                                 print("Assistant_Transcript", assistant_transcript)
+                                transcript_history.append({"role": "assistant", "text": assistant_transcript})
+
                         else:
                             pass
                     except Exception as e:
@@ -195,8 +306,11 @@ async def handle_media_stream(websocket: WebSocket, phone_number:str):
                                 "payload": audio_payload
                             }
                         }
+                        # print("latest_media_timestamp", latest_media_timestamp)
+                        # print("first packet is going to send")
                         await websocket.send_json(audio_delta)
-
+                        # print("first packet sending")
+                        # print("media time stamp after first packet",latest_media_timestamp)
                         if response_start_timestamp_twilio is None:
                             response_start_timestamp_twilio = latest_media_timestamp
                             if SHOW_TIMING_MATH:
@@ -206,12 +320,13 @@ async def handle_media_stream(websocket: WebSocket, phone_number:str):
                         if response.get('item_id'):
                             # If the item_id has changed, assume a new response is starting.
                             if last_assistant_item is not None and response['item_id'] != last_assistant_item:
-                                response_start_timestamp_twilio = latest_media_timestamp
+                                response_start_timestamp_twilio = latest_media_timestamp  # Reset start time for the new item.
                             last_assistant_item = response['item_id']
                         print("last_assistant_item", last_assistant_item)
 
                         await send_mark(websocket, stream_sid)
 
+                    # Trigger an interruption. Your use case might work better using `input_audio_buffer.speech_stopped`, or combining the two.
                     if response.get('type') == 'input_audio_buffer.speech_started':
                         print("Speech started detected.")
                         if last_assistant_item:
@@ -259,8 +374,11 @@ async def handle_media_stream(websocket: WebSocket, phone_number:str):
                 }
                 await connection.send_json(mark_event)
                 mark_queue.append('responsePart')
+        try:
+            await asyncio.gather(receive_from_twilio(), send_to_twilio())
+        finally:
+            await finalize_call(callSid, phone_number, transcript_history)
 
-        await asyncio.gather(receive_from_twilio(), send_to_twilio())
 
 async def send_initial_conversation_item(openai_ws, phone_number):
     """Send initial conversation item if AI talks first."""
@@ -284,15 +402,18 @@ async def send_initial_conversation_item(openai_ws, phone_number):
     await openai_ws.send(json.dumps({"type": "response.create"}))
 
 
-async def initialize_session(openai_ws, phone_number: str):
+async def initialize_session(openai_ws, phone_number: str, callSid:str):
     """Control initial session with OpenAI."""
     print("phone_number", phone_number)
-    user_info = get_user_data(phone_number)
+    user_info = get_user_data(phone_number)  # Ensure get_user_data() returns user details as a string or formatted text
     print("user_info", user_info)
     session_update = {
         "type": "session.update",
         "session": {
             "turn_detection": {"type": "server_vad",
+                # "threshold": 0.6,
+                # "prefix_padding_ms": 300,
+                # "silence_duration_ms": 400
             },
             "input_audio_transcription": {
                 "model": "whisper-1"
@@ -300,7 +421,7 @@ async def initialize_session(openai_ws, phone_number: str):
             "input_audio_format": "g711_ulaw",
             "output_audio_format": "g711_ulaw",
             "voice": VOICE,
-            "instructions": SYSTEM_MESSAGE + f"\n user information {user_info}",
+            "instructions": SYSTEM_MESSAGE + f"\n user information {user_info} + user CallSid : {callSid}",
             "modalities": ["text", "audio"],
             "temperature": 0.8,
             "tools" : tools,
@@ -309,4 +430,6 @@ async def initialize_session(openai_ws, phone_number: str):
     }
     print('Sending session update:', json.dumps(session_update))
     await openai_ws.send(json.dumps(session_update))
+
+    # Uncomment the next line to have the AI speak first
     await send_initial_conversation_item(openai_ws, phone_number)
