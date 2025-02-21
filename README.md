@@ -5,23 +5,38 @@ An AI-based voice assistant that uses **Twilio** for telephony, **OpenAI** (Real
 ## Directory Structure
 ```
 slahuddin-ch-aws_calling/
-├── instructions.txt
-├── main.py
-├── requirements.txt
-└── tools.py
+├── Chatbot/
+│   ├── chatbot.py
+│   └── requirements.txt
+└── Twilio-Calling/
+    ├── Dockerfile
+    ├── Twilio-README.md
+    ├── docker-compose.yaml
+    ├── instructions.txt
+    ├── main.py
+    ├── requirements.txt
+    ├── tools.py
+    ├── .dockerignore
+    └── .gitignore
 ```
 
+## Twilio-Calling:
+
+- **Dockerfile**: Defines a lightweight containerized environment for deploying the application.
+- **Docker-compose.yaml**: Automates the setup and deployment of the Twilio-Calling service using Docker.
 - **instructions.txt**: Holds the system prompt detailing how the assistant should behave.
-- **main.py**: Handles incoming phone calls via Twilio, streams audio to OpenAI for real-time transcription and response, and returns synthesized speech back to the caller.
-- **requirements.txt**: Lists all Python dependencies needed.
+- **main.py**: Handles Twilio WebSocket audio streaming, interacts with OpenAI’s real-time API, and provides responses.
+- **requirements.txt**: Lists Python dependencies for Twilio voice assistant.
 - **tools.py**: Defines the function(s) that OpenAI can call to fetch user data or other external information.
+- **.dockerignore**: Excludes unnecessary files when building the Docker image.
+- **.gitignore**: Ensures sensitive and unnecessary files are not tracked by Git.
 
 ## Setup Instructions
 
 1. **Clone the Repository:**
    ```bash
    git clone <your_repo_url>
-   cd slahuddin-ch-aws_calling
+   cd slahuddin-ch-aws_calling/Twilio-Calling
    ```
 
 2. **Install Dependencies:**
