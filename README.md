@@ -23,7 +23,7 @@ slahuddin-ch-aws_calling/
 ## Twilio-Calling:
 
 - **Dockerfile**: Defines a lightweight containerized environment for deploying the application.
-- **Docker-compose.yaml**: Automates the setup and deployment of the Twilio-Calling service using Docker.
+- **docker-compose.yaml**: Automates the setup and deployment of the Twilio-Calling service using Docker.
 - **instructions.txt**: Holds the system prompt detailing how the assistant should behave.
 - **main.py**: Handles Twilio WebSocket audio streaming, interacts with OpenAI’s real-time API, and provides responses.
 - **requirements.txt**: Lists Python dependencies for Twilio voice assistant.

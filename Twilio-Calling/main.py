@@ -430,6 +430,4 @@ async def initialize_session(openai_ws, phone_number: str, callSid:str):
     }
     print('Sending session update:', json.dumps(session_update))
     await openai_ws.send(json.dumps(session_update))
-
-    # Uncomment the next line to have the AI speak first
     await send_initial_conversation_item(openai_ws, phone_number)
