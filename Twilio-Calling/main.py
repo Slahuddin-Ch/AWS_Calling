@@ -6,6 +6,7 @@ import aiofiles
 import websockets
 import base64
 import json
+import wave
 import audioop
 # import webrtcvad
 from utils import *
@@ -19,6 +20,8 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from twilio.twiml.voice_response import VoiceResponse, Connect, Say, Stream
 
 load_dotenv()
+
+call_user_info = {}
 
 # Configuration
 account_sid = os.getenv('TWILIO_ACCOUNT_SID')
@@ -117,15 +120,19 @@ async def handle_incoming_call(request: Request):
     # phone = data['Caller']
     # phone_number = phone[-10:]
     print("phone_number",phone_number)
+    user_info = await get_customer_data(phone_number)
     print(data)
     host = request.url.hostname
     connect = Connect()
+    data = user_info['response']
+    call_user_info[callSid] = data
     # connect.stream(url=f'wss://{host}/media-stream')
     # stream = Stream(url=f'wss://{host}/media-stream')
     # stream.parameter(name="caller", value=phone_number)
     # connect.append(stream)
     # connect.stream(url=f'wss://{host}/media-stream?caller={phone_number}')
     stream = Stream(url=f'wss://{host}/media-stream/{phone_number}/{callSid}')
+    # stream.parameter(name='data', value=data)
     connect.append(stream)
     response.append(connect)
     return HTMLResponse(content=str(response), media_type="application/xml")
@@ -135,9 +142,14 @@ async def handle_media_stream(websocket: WebSocket, phone_number:str, callSid:st
     """Handle WebSocket connections between Twilio and OpenAI."""
     print("Client connected")
     print("websocket", websocket)
+    # print(data)
+    # user_info = websocket['customParameters'].get("data")
+    # print(user_info)
     # caller = websocket['customParameters'].get("caller")
     # print("Caller from query params:", caller)
     await websocket.accept()
+    user_info = call_user_info.get(callSid)
+    print("User info:", user_info)
     # Updated part at the beginning of handle_media_stream:
     print("phone_number", phone_number)
     print("CallSid", callSid)
@@ -154,7 +166,7 @@ async def handle_media_stream(websocket: WebSocket, phone_number:str, callSid:st
         }
     ) as openai_ws:
         
-        await initialize_session(openai_ws, phone_number, callSid)
+        await initialize_session(openai_ws, user_info, callSid)
 
         # Connection specific state
         stream_sid = None
@@ -166,12 +178,18 @@ async def handle_media_stream(websocket: WebSocket, phone_number:str, callSid:st
         async def receive_from_twilio():
             """Receive audio data from Twilio and send it to the OpenAI Realtime API."""
             nonlocal stream_sid, latest_media_timestamp
+            # wav_filename = f"audio_{callSid}.wav"
+            # with wave.open(wav_filename, 'wb') as wf:
+            #     wf.setnchannels(1)         # mono audio
+            #     wf.setsampwidth(2)           # 16-bit PCM (2 bytes)
+            #     wf.setframerate(8000)
             try:
                 async for message in websocket.iter_text():
                     data = json.loads(message)
                     if data['event'] == 'media' and openai_ws.open:
                         # mu_law_data = base64.b64decode(data['media']['payload'])
                         # pcm_data = audioop.ulaw2lin(mu_law_data, 2)
+                        # wf.writeframes(pcm_data)
                         # is_speech = vad.is_speech(pcm_data, 8000)
                         # if is_speech:
                         #     print("Speech detected by VAD:", is_speech)
@@ -187,6 +205,8 @@ async def handle_media_stream(websocket: WebSocket, phone_number:str, callSid:st
                     elif data['event'] == 'start':
                         stream_sid = data['start']['streamSid']
                         print("Full start event payload:", data['start'])
+                        # user_info = data['start']['customParameters'].get('data')
+                        # print(user_info)
                         # caller = data['start']['customParameters']['caller']
                         # print("start_event with caller", caller)
                         print(f"Incoming stream has started {stream_sid}")
@@ -251,7 +271,7 @@ async def handle_media_stream(websocket: WebSocket, phone_number:str, callSid:st
                             args = json.loads(response['arguments'])
                             phone_number = args['phone_number']
                             subscription_name = args["subscription_name"]
-                            data = await cancel_order(phone_number, subscription_name)
+                            data = await cancel_order(phone=phone_number, flag = subscription_name)
                             data = json.dumps(data)
 
                         elif name == "trial_extension":
@@ -291,6 +311,12 @@ async def handle_media_stream(websocket: WebSocket, phone_number:str, callSid:st
                                 "payload": audio_payload
                             }
                         }
+                        # audio_bytes = base64.b64decode(response['delta'])
+                        # with open("temp_audio.ulaw", "wb") as f:
+                        #     f.write(audio_bytes)
+
+                        # with open("temp_audio1.wav", "wb") as audio_file:
+                        #     audio_file.write(audio_payload)
                         # print("latest_media_timestamp", latest_media_timestamp)
                         # print("first packet is going to send")
                         await websocket.send_json(audio_delta)
@@ -387,14 +413,10 @@ async def send_initial_conversation_item(openai_ws, name):
     await openai_ws.send(json.dumps(initial_conversation_item))
     await openai_ws.send(json.dumps({"type": "response.create"}))
 
-
-async def initialize_session(openai_ws, phone_number: str, callSid:str):
+async def initialize_session(openai_ws, data:str, callSid:str):
     """Control initial session with OpenAI."""
-    print("phone_number", phone_number)
-    data = await get_customer_data(phone_number)
-    removed_value = data['response'].pop('legal_order_history', None)
-    removed_value1 = data['response'].pop('upsell_order_history', None)
-    name = data['response']['first_name']
+    
+    name = data['first_name']
     
     session_update = {
         "type": "session.update",
@@ -420,3 +442,37 @@ async def initialize_session(openai_ws, phone_number: str, callSid:str):
     print('Sending session update:', json.dumps(session_update))
     await openai_ws.send(json.dumps(session_update))
     await send_initial_conversation_item(openai_ws, name)
+
+
+# async def initialize_session(openai_ws, phone_number: str, callSid:str):
+#     """Control initial session with OpenAI."""
+#     print("phone_number", phone_number)
+#     data = await get_customer_data(phone_number)
+#     removed_value = data['response'].pop('legal_order_history', None)
+#     removed_value1 = data['response'].pop('upsell_order_history', None)
+#     name = data['response']['first_name']
+    
+#     session_update = {
+#         "type": "session.update",
+#         "session": {
+#             "turn_detection": {"type": "server_vad",
+#                 # "threshold": 0.3,
+#                 # "prefix_padding_ms": 300,
+#                 # "silence_duration_ms": 400
+#             },
+#             "input_audio_transcription": {
+#                 "model": "whisper-1"
+#             },
+#             "input_audio_format": "g711_ulaw",
+#             "output_audio_format": "g711_ulaw",
+#             "voice": VOICE,
+#             "instructions": SYSTEM_MESSAGE + f"\n customer information {data} + customer CallSid : {callSid}",
+#             "modalities": ["text", "audio"],
+#             "temperature": 0.8,
+#             "tools" : tools,
+
+#         }
+#     }
+#     print('Sending session update:', json.dumps(session_update))
+#     await openai_ws.send(json.dumps(session_update))
+#     await send_initial_conversation_item(openai_ws, name)

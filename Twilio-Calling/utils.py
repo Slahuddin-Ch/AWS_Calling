@@ -249,7 +249,7 @@ async def billing_extension(extension_days: str, phone: str, customer_id: str = 
 
 # UPDATED PART (replaced requests with aiohttp for async behavior):
 
-import aiohttp  # <-- new import added for asynchronous HTTP calls
+import aiohttp
 
 async def cancel_order(
     flag: str,
@@ -303,7 +303,9 @@ async def cancel_order(
 # import asyncio
 
 # async def main():
-#     data = await billing_extension(extension_days='1', phone = '+923114663661')
+#     data =await get_customer_data("+923114663661")
+
+#     # data = await billing_extension(extension_days='1', phone = '+923114663661')
 #     # removed_value = data['response'].pop('legal_order_history', None)
 #     # removed_value1 = data['response'].pop('upsell_order_history', None)
 #     print("Customer data:", data)
