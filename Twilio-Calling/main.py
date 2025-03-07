@@ -31,7 +31,6 @@ PORT = int(os.getenv('PORT', 5050))
 
 client = Client(account_sid, auth_token)
 
-# prompt = "instructions.txt"
 prompt = "prompt.txt"
 with open(prompt, 'r') as file:
     SYSTEM_MESSAGE = file.read()
@@ -45,7 +44,7 @@ LOG_EVENT_TYPES = [
     'response.done', 'input_audio_buffer.committed',
     'input_audio_buffer.speech_stopped', 'input_audio_buffer.speech_started',
     'session.created', 'response.content.done', 
-    'conversation.item.created',
+    # 'conversation.item.created', 'response.audio.delta', 'response.audio.done',
     'session.created', 'session.updated',
     # 'response.audio.delta',
     'conversation.item.input_audio_transcription.completed',
@@ -75,6 +74,11 @@ def end_call(call_sid):
     except Exception as e:
         print(f"Error ending call {call_sid}: {str(e)}")
 
+async def wait_audio_complete_then_end(call_sid, audio_event):
+    print(f"Waiting for AI to finish sending all audio before ending call {call_sid}")
+    await audio_event.wait()
+    await asyncio.sleep(0.5)  # Tiny buffer, not mandatory if you handle correctly.
+    end_call(call_sid)
 
 async def finalize_call(callSid: str, phone_number: str, transcript_history: list):
     # Combine the transcript entries into a single text
@@ -126,13 +130,7 @@ async def handle_incoming_call(request: Request):
     connect = Connect()
     data = user_info['response']
     call_user_info[callSid] = data
-    # connect.stream(url=f'wss://{host}/media-stream')
-    # stream = Stream(url=f'wss://{host}/media-stream')
-    # stream.parameter(name="caller", value=phone_number)
-    # connect.append(stream)
-    # connect.stream(url=f'wss://{host}/media-stream?caller={phone_number}')
     stream = Stream(url=f'wss://{host}/media-stream/{phone_number}/{callSid}')
-    # stream.parameter(name='data', value=data)
     connect.append(stream)
     response.append(connect)
     return HTMLResponse(content=str(response), media_type="application/xml")
@@ -156,7 +154,7 @@ async def handle_media_stream(websocket: WebSocket, phone_number:str, callSid:st
 
     # print("Caller from query params 2:", caller)
     transcript_history = []
-
+    audio_complete_event = asyncio.Event()
 # Updated call to initialize_session:
     async with websockets.connect(
         'wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17',
@@ -207,8 +205,6 @@ async def handle_media_stream(websocket: WebSocket, phone_number:str, callSid:st
                         print("Full start event payload:", data['start'])
                         # user_info = data['start']['customParameters'].get('data')
                         # print(user_info)
-                        # caller = data['start']['customParameters']['caller']
-                        # print("start_event with caller", caller)
                         print(f"Incoming stream has started {stream_sid}")
                         # await initialize_session(openai_ws, caller)
 
@@ -223,6 +219,7 @@ async def handle_media_stream(websocket: WebSocket, phone_number:str, callSid:st
                 print("Client disconnected.")
                 if openai_ws.open:
                     await openai_ws.close()
+        
 
         async def send_to_twilio():
             """Receive events from the OpenAI Realtime API, send audio back to Twilio."""
@@ -252,20 +249,22 @@ async def handle_media_stream(websocket: WebSocket, phone_number:str, callSid:st
                             data = await get_customer_data(phone_number)
                             data = json.dumps(data)
 
-                        elif name == "end_call":
-                            args = json.loads(response['arguments'])
-                            callSid = args['callSid']
-                            print("callSid", callSid)
-                            end_call(callSid)
+                        # elif name == "end_call":
+                        #     args = json.loads(response['arguments'])
+                        #     callSid = args['callSid']
+                        #     print("callSid", callSid)
+                        #     await wait_audio_complete_then_end(callSid, audio_complete_event)
+                        #     # asyncio.create_task(wait_audio_complete_then_end(callSid, audio_complete_event))
 
-                        elif name == "forward_call":
-                            args = json.loads(response['arguments'])
-                            callSid = args['callSid']  # Fallback to the current callSid if not provided
-                            print(callSid)
-                            agent_number = "+923364589301"
-                            print(f"Function Call: Forwarding call with SID {callSid} to agent {agent_number}")
-                            forward_call(callSid, agent_number)
-                            data = json.dumps({"status": "Call forwarded", "agent_number": agent_number})
+
+                        # elif name == "forward_call":
+                        #     args = json.loads(response['arguments'])
+                        #     callSid = args['callSid']  # Fallback to the current callSid if not provided
+                        #     print(callSid)
+                        #     agent_number = "+923364589301"
+                        #     print(f"Function Call: Forwarding call with SID {callSid} to agent {agent_number}")
+                        #     forward_call(callSid, agent_number)
+                        #     data = json.dumps({"status": "Call forwarded", "agent_number": agent_number})
 
                         elif name == "cancel_order":
                             args = json.loads(response['arguments'])
@@ -336,6 +335,9 @@ async def handle_media_stream(websocket: WebSocket, phone_number:str, callSid:st
                         print("last_assistant_item", last_assistant_item)
 
                         await send_mark(websocket, stream_sid)
+                    
+                    # if response.get('type') == 'response.audio.done':
+                    #     audio_complete_event.set()
 
                     # Trigger an interruption. Your use case might work better using `input_audio_buffer.speech_stopped`, or combining the two.
                     if response.get('type') == 'input_audio_buffer.speech_started':
@@ -442,37 +444,3 @@ async def initialize_session(openai_ws, data:str, callSid:str):
     print('Sending session update:', json.dumps(session_update))
     await openai_ws.send(json.dumps(session_update))
     await send_initial_conversation_item(openai_ws, name)
-
-
-# async def initialize_session(openai_ws, phone_number: str, callSid:str):
-#     """Control initial session with OpenAI."""
-#     print("phone_number", phone_number)
-#     data = await get_customer_data(phone_number)
-#     removed_value = data['response'].pop('legal_order_history', None)
-#     removed_value1 = data['response'].pop('upsell_order_history', None)
-#     name = data['response']['first_name']
-    
-#     session_update = {
-#         "type": "session.update",
-#         "session": {
-#             "turn_detection": {"type": "server_vad",
-#                 # "threshold": 0.3,
-#                 # "prefix_padding_ms": 300,
-#                 # "silence_duration_ms": 400
-#             },
-#             "input_audio_transcription": {
-#                 "model": "whisper-1"
-#             },
-#             "input_audio_format": "g711_ulaw",
-#             "output_audio_format": "g711_ulaw",
-#             "voice": VOICE,
-#             "instructions": SYSTEM_MESSAGE + f"\n customer information {data} + customer CallSid : {callSid}",
-#             "modalities": ["text", "audio"],
-#             "temperature": 0.8,
-#             "tools" : tools,
-
-#         }
-#     }
-#     print('Sending session update:', json.dumps(session_update))
-#     await openai_ws.send(json.dumps(session_update))
-#     await send_initial_conversation_item(openai_ws, name)

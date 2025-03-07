@@ -12,32 +12,32 @@ tools = [
 
                 }
             },
-            {
-                "type": "function",
-                "name": "end_call",
-                "description": "End the ongoing call",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "callSid": { "type": "string", "description": "It is unique Id of the call." }
-                    },
-                    "required": ["callSid"],
+            # {
+            #     "type": "function",
+            #     "name": "end_call",
+            #     "description": "End the ongoing call",
+            #     "parameters": {
+            #         "type": "object",
+            #         "properties": {
+            #             "callSid": { "type": "string", "description": "It is unique Id of the call." }
+            #         },
+            #         "required": ["callSid"],
 
-                }
-            },
-            {
-                "type": "function",
-                "name": "forward_call",
-                "description": "forward the ongoing call",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "callSid": { "type": "string", "description": "It is unique Id of the call." }
-                    },
-                    "required": ["callSid"],
+            #     }
+            # },
+            # {
+            #     "type": "function",
+            #     "name": "forward_call",
+            #     "description": "forward the ongoing call",
+            #     "parameters": {
+            #         "type": "object",
+            #         "properties": {
+            #             "callSid": { "type": "string", "description": "It is unique Id of the call." }
+            #         },
+            #         "required": ["callSid"],
 
-                }
-            },
+            #     }
+            # },
             {
                 "type": "function",
                 "name": "cancel_order",
