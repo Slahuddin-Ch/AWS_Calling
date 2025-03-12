@@ -220,7 +220,6 @@ async def handle_media_stream(websocket: WebSocket, phone_number:str, callSid:st
                 if openai_ws.open:
                     await openai_ws.close()
         
-
         async def send_to_twilio():
             """Receive events from the OpenAI Realtime API, send audio back to Twilio."""
             nonlocal stream_sid, last_assistant_item, response_start_timestamp_twilio
@@ -418,13 +417,13 @@ async def send_initial_conversation_item(openai_ws, name):
 async def initialize_session(openai_ws, data:str, callSid:str):
     """Control initial session with OpenAI."""
     
-    name = data['first_name']
+    name = data.get('first_name', '')
     
     session_update = {
         "type": "session.update",
         "session": {
             "turn_detection": {"type": "server_vad",
-                # "threshold": 0.3,
+                # "threshold": 0.8,
                 # "prefix_padding_ms": 300,
                 # "silence_duration_ms": 400
             },
