@@ -121,14 +121,19 @@ async def handle_incoming_call(request: Request):
     data = dict(form_data)
     callSid = data['CallSid']
     phone_number = data['Caller']
-    # phone = data['Caller']
-    # phone_number = phone[-10:]
+    phone = data['Caller']
+    phone_number = phone[-10:]
     print("phone_number",phone_number)
     user_info = await get_customer_data(phone_number)
+    print(user_info)
     print(data)
     host = request.url.hostname
     connect = Connect()
-    data = user_info['response']
+    if 'response' in user_info:
+        data = user_info['response']
+    else:
+        data = user_info
+    # data = user_info['response']
     call_user_info[callSid] = data
     stream = Stream(url=f'wss://{host}/media-stream/{phone_number}/{callSid}')
     connect.append(stream)

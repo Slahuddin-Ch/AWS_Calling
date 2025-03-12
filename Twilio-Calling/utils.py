@@ -85,7 +85,7 @@ async def get_customer_data(phone: str):
 
     # Ensure phone number is formatted correctly
     formatted_phone = phone.lstrip("+")  # Remove '+' if present
-    
+    formatted_phone = formatted_phone[-10:]
     # Construct the request URL manually to prevent encoding issues
     request_url = f"{url}?phone={formatted_phone}"
     
@@ -162,10 +162,10 @@ import requests
 #         raise
 
 async def billing_extension(extension_days: str, phone: str, customer_id: str = None, order_id: str = None, product_id: str = None) -> dict:
-    formatted_phone = phone.lstrip("+")  # Remove '+' if present
     BASE_URL = os.getenv("BACKEND_BASE_URL", "https://legalaibots-backend-vy7ua.ondigitalocean.app")
     url = f"{BASE_URL}/api/voice-bot/billingExtension"
-    
+    formatted_phone = phone.lstrip("+")  # Remove '+' if present
+    formatted_phone = formatted_phone[-10:]
     payload = {
         "extension_days": extension_days,
         "phone": formatted_phone,
@@ -180,7 +180,6 @@ async def billing_extension(extension_days: str, phone: str, customer_id: str = 
     async with aiohttp.ClientSession() as session:
         try:
             async with session.post(url, json=payload, timeout=10) as response:
-                response.raise_for_status()
                 return await response.json()
         except aiohttp.ClientError as e:
             print(f"Error calling billingExtension API: {e}")
@@ -264,8 +263,9 @@ async def cancel_order(
     BASE_URL = os.getenv("BACKEND_BASE_URL", "https://legalaibots-backend-vy7ua.ondigitalocean.app")
     url = f"{BASE_URL}/api/voice-bot/cancelOrder"
 
-    formatted_phone = phone.lstrip("+") 
-
+    formatted_phone = phone.lstrip("+")  # Remove '+' if present
+    formatted_phone = formatted_phone[-10:]
+    flag = flag.lower()
     payload = {
         "flag": flag,
         "phone": formatted_phone
@@ -291,21 +291,10 @@ async def cancel_order(
             print(f"Error calling cancelOrder API: {e}")
             raise
 
-# data = billing_extension(extension_days='13', phone='+923364589301')
-# print(type(data))
-
-# data = get_customer_data("+923456710033")
-# print(data)
-# data = cancel_order(flag = 'legal', phone = '+923364589301')
-# print(data)
-# data['']
-# print(data['response']['customer_legal_status'])
-# import asyncio
-
 # async def main():
-#     data =await get_customer_data("+923456710033")
-
-#     # data = await billing_extension(extension_days='1', phone = '+923114663661')
+#     # data =await get_customer_data("2537853785")
+#     data = await cancel_order(flag='both', phone='2537853785')
+#     # data = await billing_extension(extension_days='1', phone = '+12537853785')
 #     # removed_value = data['response'].pop('legal_order_history', None)
 #     # removed_value1 = data['response'].pop('upsell_order_history', None)
 #     print("Customer data:", data)
